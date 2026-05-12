@@ -1,0 +1,403 @@
+@tool
+extends Node
+class_name PropertyBinding
+
+## Connects one data node property to one UI Control property.
+const ControlBindingAdaptersScript := preload("res://addons/data_binding/runtime/control_binding_adapters.gd")
+
+enum BindingMode {
+	DATA_TO_UI,
+	UI_TO_DATA,
+	TWO_WAY,
+	INITIAL_SYNC_ONLY,
+}
+
+enum InitialSync {
+	NONE,
+	DATA_TO_UI,
+	UI_TO_DATA,
+}
+
+const DATA_CHANGED_SIGNAL := &"property_changed"
+
+## Enables this binding at runtime.
+@export var enabled := true
+## Controls which direction values flow between the data node and control node.
+@export_enum("Data → UI", "UI → Data", "Two Way", "Initial Sync Only") var mode: int = BindingMode.DATA_TO_UI
+## Optional initial value sync performed after runtime connections are made.
+@export_enum("None", "Data → UI", "UI → Data") var initial_sync: int = InitialSync.DATA_TO_UI
+
+
+#@export_group("Data") # data spacer
+
+## Node containing the data property.
+@export var data_node: Node:
+	set(value):
+		if data_node == value:
+			return
+		data_node = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+## Reflected property name on data_node.
+@export var data_property: StringName = &"":
+	set(value):
+		if data_property == value:
+			return
+		data_property = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+
+#@export_group("Control") # control spacer
+
+## Control node containing the UI property.
+@export var control_node: Control:
+	set(value):
+		if control_node == value:
+			return
+		control_node = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+## Reflected property name on control_node.
+@export var control_property: StringName = &"":
+	set(value):
+		if control_property == value:
+			return
+		control_property = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+
+#@export_group("Control Signals")
+
+## Manual signal override for custom controls. Empty uses the configured default signal.
+@export var control_changed_signal: StringName = &"":
+	set(value):
+		if control_changed_signal == value:
+			return
+		control_changed_signal = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+## Optional converter that maps between data and control value representations.
+@export var converter: BindingConverter:
+	set(value):
+		if converter == value:
+			return
+		converter = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+
+@export_group("Runtime Binding")
+## Rebuilds this binding automatically from _ready() during runtime.
+@export var rebind_on_ready := false
+## Prints runtime validation warnings when a binding cannot be rebuilt.
+@export var warn_on_invalid := true
+
+## Editor-only picker state for showing fallback data properties.
+var show_all_data_properties := false
+## Editor-only picker state for showing fallback control properties.
+var show_all_control_properties := false
+## Editor-only picker state for showing reflected control signals.
+var show_all_control_signals := false
+
+var _updating := false
+var _connected_data_node: Node
+var _connected_control_node: Control
+var _connected_control_signal := &""
+var _connected_control_callable: Callable
+var _connected_data_callable: Callable
+
+
+func _init() -> void:
+	_connected_data_callable = Callable(self, "_on_data_property_changed")
+
+
+func _ready() -> void:
+	if Engine.is_editor_hint():
+		return
+
+	if rebind_on_ready:
+		rebuild()
+
+
+func _exit_tree() -> void:
+	disconnect_binding()
+
+
+## Disconnects existing listeners, validates settings, reconnects listeners, and applies initial sync.
+func rebuild() -> void:
+	disconnect_binding()
+
+	if Engine.is_editor_hint():
+		return
+
+	if not enabled:
+		return
+
+	var issues := validate()
+	if warn_on_invalid:
+		for issue in issues:
+			push_warning("%s: %s" % [get_path(), issue])
+
+	if issues.size() > 0:
+		return
+
+	if _uses_data_to_ui() and mode != BindingMode.INITIAL_SYNC_ONLY:
+		_connect_data_changed_signal()
+
+	if _uses_ui_to_data():
+		_connect_control_changed_signal()
+
+	match initial_sync:
+		InitialSync.DATA_TO_UI:
+			if _can_read_data() and _can_write_control():
+				refresh_from_data()
+		InitialSync.UI_TO_DATA:
+			if _can_read_control() and _can_write_data():
+				commit_to_data()
+
+
+## Disconnects signal listeners created by rebuild().
+func disconnect_binding() -> void:
+	if _connected_data_node != null and _connected_data_node.is_connected(DATA_CHANGED_SIGNAL, _connected_data_callable):
+		_connected_data_node.disconnect(DATA_CHANGED_SIGNAL, _connected_data_callable)
+
+	if _connected_control_node != null and _connected_control_signal != &"" and not _connected_control_callable.is_null():
+		if _connected_control_node.is_connected(_connected_control_signal, _connected_control_callable):
+			_connected_control_node.disconnect(_connected_control_signal, _connected_control_callable)
+
+	_connected_data_node = null
+	_connected_control_node = null
+	_connected_control_signal = &""
+	_connected_control_callable = Callable()
+
+
+## Pulls the current data value, converts it, and writes it to the control property.
+func refresh_from_data() -> void:
+	if _updating or not _can_read_data() or not _can_write_control():
+		return
+
+	var data_value := data_node.get(data_property)
+	var target_value := _convert_to_target(data_value)
+	if _values_equal(control_node.get(control_property), target_value):
+		return
+
+	_updating = true
+	control_node.set(control_property, target_value)
+	_updating = false
+
+
+## Pulls the current control value, converts it, and writes it to the data property.
+func commit_to_data() -> void:
+	if _updating or not _can_read_control() or not _can_write_data():
+		return
+
+	var control_value := control_node.get(control_property)
+	var source_value := _convert_to_source(control_value)
+	if _values_equal(data_node.get(data_property), source_value):
+		return
+
+	_updating = true
+	data_node.set(data_property, source_value)
+	_updating = false
+
+
+## Returns validation issues that would prevent this binding from connecting cleanly.
+func validate() -> PackedStringArray:
+	var issues := PackedStringArray()
+
+	if data_node == null:
+		issues.append("Data node is not assigned.")
+	if control_node == null:
+		issues.append("Control node is not assigned.")
+	if data_property == &"":
+		issues.append("Data property is empty.")
+	if control_property == &"":
+		issues.append("Control property is empty.")
+
+	if data_node != null and data_property != &"" and not _property_exists(data_node, data_property):
+		issues.append("Data property '%s' was not found on %s." % [data_property, data_node.name])
+
+	if control_node != null and control_property != &"" and not _property_exists(control_node, control_property):
+		issues.append("Control property '%s' was not found on %s." % [control_property, control_node.name])
+
+	if _can_read_data() and _can_read_control() and not _selected_property_types_are_compatible():
+		issues.append("Data property '%s' and control property '%s' have incompatible types for the selected converter." % [
+			data_property,
+			control_property,
+		])
+
+	if _uses_data_to_ui() and mode != BindingMode.INITIAL_SYNC_ONLY:
+		if data_node != null and not data_node.has_signal(DATA_CHANGED_SIGNAL):
+			issues.append("Data -> UI updates require the data node to emit property_changed(property, value).")
+
+	if _uses_ui_to_data():
+		if converter != null and not converter.can_convert_back():
+			issues.append("UI -> Data requires a reversible converter.")
+
+		if control_node != null:
+			var signal_name := _get_control_changed_signal()
+			if signal_name == &"":
+				issues.append("No control change signal is configured for this control property.")
+			elif not control_node.has_signal(signal_name):
+				issues.append("Control signal '%s' was not found on %s." % [signal_name, control_node.name])
+
+	return issues
+
+
+func _connect_data_changed_signal() -> void:
+	if data_node == null or not data_node.has_signal(DATA_CHANGED_SIGNAL):
+		return
+	if not data_node.is_connected(DATA_CHANGED_SIGNAL, _connected_data_callable):
+		data_node.connect(DATA_CHANGED_SIGNAL, _connected_data_callable)
+	_connected_data_node = data_node
+
+
+func _connect_control_changed_signal() -> void:
+	var signal_name := _get_control_changed_signal()
+	if control_node == null or signal_name == &"":
+		return
+
+	var callback := Callable(self, "_on_control_changed")
+	var argument_count := ControlBindingAdaptersScript.get_signal_argument_count(control_node, signal_name)
+	if argument_count > 0:
+		callback = callback.unbind(argument_count)
+
+	if not control_node.is_connected(signal_name, callback):
+		control_node.connect(signal_name, callback)
+
+	_connected_control_node = control_node
+	_connected_control_signal = signal_name
+	_connected_control_callable = callback
+
+
+func _on_data_property_changed(changed_property, value: Variant = null) -> void:
+	if _updating:
+		return
+	if StringName(changed_property) != data_property:
+		return
+
+	if value == null:
+		refresh_from_data()
+		return
+
+	if not _can_write_control():
+		return
+
+	var target_value := _convert_to_target(value)
+	if _values_equal(control_node.get(control_property), target_value):
+		return
+
+	_updating = true
+	control_node.set(control_property, target_value)
+	_updating = false
+
+
+func _on_control_changed() -> void:
+	commit_to_data()
+
+
+func _get_control_changed_signal() -> StringName:
+	return ControlBindingAdaptersScript.resolve_changed_signal(
+		control_node,
+		control_property,
+		control_changed_signal
+	)
+
+
+func _uses_data_to_ui() -> bool:
+	return mode == BindingMode.DATA_TO_UI or mode == BindingMode.TWO_WAY or mode == BindingMode.INITIAL_SYNC_ONLY
+
+
+func _uses_ui_to_data() -> bool:
+	return mode == BindingMode.UI_TO_DATA or mode == BindingMode.TWO_WAY
+
+
+func _can_read_data() -> bool:
+	return data_node != null and data_property != &"" and _property_exists(data_node, data_property)
+
+
+func _can_write_data() -> bool:
+	return _can_read_data()
+
+
+func _can_read_control() -> bool:
+	return control_node != null and control_property != &"" and _property_exists(control_node, control_property)
+
+
+func _can_write_control() -> bool:
+	return _can_read_control()
+
+
+func _property_exists(object: Object, property_name: StringName) -> bool:
+	if object == null or property_name == &"":
+		return false
+
+	for property_info in object.get_property_list():
+		if StringName(property_info.get("name", "")) == property_name:
+			return true
+
+	return false
+
+
+func _selected_property_types_are_compatible() -> bool:
+	var data_type := _property_type(data_node, data_property)
+	var control_type := _property_type(control_node, control_property)
+
+	match mode:
+		BindingMode.DATA_TO_UI, BindingMode.INITIAL_SYNC_ONLY:
+			return _can_convert_types(data_type, control_type, false)
+		BindingMode.UI_TO_DATA:
+			return _can_convert_types(data_type, control_type, true)
+		BindingMode.TWO_WAY:
+			return _can_convert_types(data_type, control_type, false) and _can_convert_types(data_type, control_type, true)
+		_:
+			return _can_convert_types(data_type, control_type, false)
+
+
+func _property_type(object: Object, property_name: StringName) -> int:
+	if object == null or property_name == &"":
+		return TYPE_NIL
+
+	for property_info in object.get_property_list():
+		if StringName(property_info.get("name", "")) == property_name:
+			return int(property_info.get("type", TYPE_NIL))
+
+	return TYPE_NIL
+
+
+func _can_convert_types(data_type: int, control_type: int, reverse: bool) -> bool:
+	if converter != null:
+		if reverse:
+			return converter.can_convert_back_types(data_type, control_type)
+		return converter.can_convert_types(data_type, control_type)
+
+	if reverse:
+		return _types_are_assignable(control_type, data_type)
+	return _types_are_assignable(data_type, control_type)
+
+
+func _types_are_assignable(source_type: int, target_type: int) -> bool:
+	if source_type == TYPE_NIL or target_type == TYPE_NIL:
+		return true
+	if source_type == target_type:
+		return true
+	if source_type in [TYPE_INT, TYPE_FLOAT] and target_type in [TYPE_INT, TYPE_FLOAT]:
+		return true
+	if source_type in [TYPE_STRING, TYPE_STRING_NAME] and target_type in [TYPE_STRING, TYPE_STRING_NAME]:
+		return true
+	return false
+
+
+func _convert_to_target(value: Variant) -> Variant:
+	if converter == null:
+		return value
+	return converter.to_target(value)
+
+
+func _convert_to_source(value: Variant) -> Variant:
+	if converter == null:
+		return value
+	return converter.to_source(value)
+
+
+func _values_equal(left: Variant, right: Variant) -> bool:
+	return left == right

@@ -1,0 +1,110 @@
+[gd_scene format=3 uid="uid://dt6b3lutj0xov"]
+
+[ext_resource type="Script" uid="uid://bn4e21cq1fp6o" path="res://addons/data_binding/runtime/binding_host.gd" id="1_host"]
+[ext_resource type="Script" uid="uid://clad4gugh73on" path="res://addons/data_binding/runtime/property_binding.gd" id="2_binding"]
+[ext_resource type="Script" uid="uid://ycm014nk2foj" path="res://addons/data_binding/samples/sample_player_model.gd" id="3_player"]
+[ext_resource type="Script" uid="uid://couvdx1mvm0s1" path="res://addons/data_binding/samples/plain_settings_node.gd" id="4_plain"]
+
+[node name="DataBindingSample" type="Control" unique_id=636418383]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PlayerData" type="Node" parent="." unique_id=967889311]
+script = ExtResource("3_player")
+
+[node name="PlainSettings" type="Node" parent="." unique_id=994179196]
+script = ExtResource("4_plain")
+
+[node name="Bindings" type="Node" parent="." unique_id=510662796]
+script = ExtResource("1_host")
+
+[node name="PlayerNameTwoWay" type="Node" parent="Bindings" unique_id=97656835 node_paths=PackedStringArray("data_node", "control_node")]
+script = ExtResource("2_binding")
+mode = 2
+data_node = NodePath("../../PlayerData")
+data_property = &"player_name"
+control_node = NodePath("../../Form/NameEdit")
+control_property = &"text"
+rebind_on_ready = true
+
+[node name="HealthToSlider" type="Node" parent="Bindings" unique_id=101542114 node_paths=PackedStringArray("data_node", "control_node")]
+script = ExtResource("2_binding")
+mode = 2
+data_node = NodePath("../../PlayerData")
+data_property = &"health"
+control_node = NodePath("../../Form/HealthSlider")
+control_property = &"value"
+rebind_on_ready = true
+
+[node name="InvincibleToCheck" type="Node" parent="Bindings" unique_id=2144071011 node_paths=PackedStringArray("data_node", "control_node")]
+script = ExtResource("2_binding")
+mode = 2
+data_node = NodePath("../../PlayerData")
+data_property = &"invincible"
+control_node = NodePath("../../Form/InvincibleCheck")
+control_property = &"button_pressed"
+rebind_on_ready = true
+
+[node name="NicknameUiToPlainData" type="Node" parent="Bindings" unique_id=94847093 node_paths=PackedStringArray("data_node", "control_node")]
+script = ExtResource("2_binding")
+mode = 1
+initial_sync = 0
+data_node = NodePath("../../PlainSettings")
+data_property = &"nickname"
+control_node = NodePath("../../Form/NicknameEdit")
+control_property = &"text"
+rebind_on_ready = true
+
+[node name="MetricsUiToPlainData" type="Node" parent="Bindings" unique_id=1465615574 node_paths=PackedStringArray("data_node", "control_node")]
+script = ExtResource("2_binding")
+enabled = false
+mode = 1
+initial_sync = 0
+data_node = NodePath("../../PlainSettings")
+data_property = &"send_metrics"
+control_node = NodePath("../../Form/MetricsCheck")
+rebind_on_ready = true
+
+[node name="PropertyBinding" type="Node" parent="Bindings" unique_id=576926688]
+script = ExtResource("2_binding")
+
+[node name="Form" type="VBoxContainer" parent="." unique_id=866856334]
+layout_mode = 1
+anchors_preset = -1
+anchor_left = 0.1
+anchor_top = 0.1
+anchor_right = 0.9
+anchor_bottom = 0.9
+
+[node name="NameLabel" type="Label" parent="Form" unique_id=159412368]
+layout_mode = 2
+text = "Player name"
+
+[node name="NameEdit" type="LineEdit" parent="Form" unique_id=1293601381]
+layout_mode = 2
+
+[node name="HealthLabel" type="Label" parent="Form" unique_id=1953905985]
+layout_mode = 2
+text = "Health"
+
+[node name="HealthSlider" type="HSlider" parent="Form" unique_id=331070441]
+layout_mode = 2
+
+[node name="InvincibleCheck" type="CheckBox" parent="Form" unique_id=1247205492]
+layout_mode = 2
+text = "Invincible"
+
+[node name="NicknameLabel" type="Label" parent="Form" unique_id=298841092]
+layout_mode = 2
+text = "Nickname written to a plain node"
+
+[node name="NicknameEdit" type="LineEdit" parent="Form" unique_id=1307194245]
+layout_mode = 2
+
+[node name="MetricsCheck" type="CheckBox" parent="Form" unique_id=1885463487]
+layout_mode = 2
+text = "Send metrics written to a plain node"

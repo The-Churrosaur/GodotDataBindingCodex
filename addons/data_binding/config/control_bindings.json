@@ -1,0 +1,185 @@
+{
+	"CanvasItem": {
+		"visible": {},
+		"modulate": {},
+		"self_modulate": {}
+	},
+	"Control": {
+		"tooltip_text": {},
+		"mouse_filter": {},
+		"focus_mode": {}
+	},
+	"Label": {
+		"text": {},
+		"horizontal_alignment": {},
+		"vertical_alignment": {}
+	},
+	"RichTextLabel": {
+		"text": {},
+		"bbcode_enabled": {},
+		"visible_characters": {}
+	},
+	"LineEdit": {
+		"text": {
+			"signals": [
+				"text_changed",
+				"text_submitted",
+				"focus_exited"
+			]
+		},
+		"placeholder_text": {},
+		"editable": {},
+		"secret": {},
+		"max_length": {}
+	},
+	"TextEdit": {
+		"text": {
+			"signals": [
+				"text_changed",
+				"focus_exited"
+			]
+		},
+		"placeholder_text": {},
+		"editable": {}
+	},
+	"BaseButton": {
+		"button_pressed": {
+			"signals": [
+				"toggled"
+			]
+		},
+		"disabled": {}
+	},
+	"Button": {
+		"button_pressed": {
+			"signals": [
+				"toggled"
+			]
+		},
+		"text": {},
+		"icon": {}
+	},
+	"CheckBox": {
+		"button_pressed": {
+			"signals": [
+				"toggled"
+			]
+		},
+		"text": {}
+	},
+	"CheckButton": {
+		"button_pressed": {
+			"signals": [
+				"toggled"
+			]
+		},
+		"text": {}
+	},
+	"Range": {
+		"value": {},
+		"min_value": {},
+		"max_value": {},
+		"step": {}
+	},
+	"ProgressBar": {
+		"value": {},
+		"min_value": {},
+		"max_value": {},
+		"show_percentage": {}
+	},
+	"SpinBox": {
+		"value": {
+			"signals": [
+				"value_changed"
+			]
+		},
+		"min_value": {},
+		"max_value": {},
+		"step": {},
+		"editable": {}
+	},
+	"Slider": {
+		"value": {
+			"signals": [
+				"value_changed"
+			]
+		},
+		"min_value": {},
+		"max_value": {},
+		"step": {}
+	},
+	"HSlider": {
+		"value": {
+			"signals": [
+				"value_changed"
+			]
+		},
+		"min_value": {},
+		"max_value": {},
+		"step": {}
+	},
+	"VSlider": {
+		"value": {
+			"signals": [
+				"value_changed"
+			]
+		},
+		"min_value": {},
+		"max_value": {},
+		"step": {}
+	},
+	"ScrollBar": {
+		"value": {
+			"signals": [
+				"value_changed"
+			]
+		}
+	},
+	"HScrollBar": {
+		"value": {
+			"signals": [
+				"value_changed"
+			]
+		},
+		"min_value": {},
+		"max_value": {},
+		"step": {}
+	},
+	"VScrollBar": {
+		"value": {
+			"signals": [
+				"value_changed"
+			]
+		},
+		"min_value": {},
+		"max_value": {},
+		"step": {}
+	},
+	"OptionButton": {
+		"selected": {
+			"signals": [
+				"item_selected"
+			]
+		},
+		"disabled": {}
+	},
+	"TextureRect": {
+		"texture": {},
+		"expand_mode": {},
+		"stretch_mode": {}
+	},
+	"ColorRect": {
+		"color": {}
+	},
+	"NinePatchRect": {
+		"texture": {},
+		"draw_center": {}
+	},
+	"Panel": {
+		"visible": {},
+		"modulate": {}
+	},
+	"Container": {
+		"visible": {}
+	}
+}
