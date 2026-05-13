@@ -20,14 +20,24 @@ Control changed signals are catalog-driven by exact control type and property. A
 
 Leaving `control_changed_signal` empty means the binding will use the first configured signal for the selected control type and property.
 
-Use the `Show all...` entries in the data property, control property, and control signal pickers to append fallback options without cluttering the inspector.
+Data changed signals are reflected from the selected data node's script class. `data_changed_signal` defaults to `property_changed`, but the selected signal is used only as a notification trigger: signal arguments are ignored and the binding reads `data_property` when the signal fires. Use the `Show all data signals` entry to include inherited engine signals.
+
+Use the `Show all...` entries in the data property, data signal, control property, and control signal pickers to append fallback options without cluttering the inspector.
 
 ## Binding Modes
 
-- `Data -> UI` listens to `property_changed(property, value)` on the data node and writes to the control.
+- `Data -> UI` listens for data changes and writes to the control.
 - `UI -> Data` listens only to the control change signal and writes to the data node. The data node does not need to implement `property_changed`.
 - `Two Way` connects both sides and uses a reentrancy guard to avoid echo loops.
 - `Initial Sync Only` performs the configured initial sync without listening for later changes.
+
+## Data Update Sources
+
+`PropertyBinding.data_update_source` controls how live data-to-UI updates are detected:
+
+- `Signal Only` requires the data node to expose the selected `data_changed_signal`. This is the default.
+- `Polling` always checks the reflected data property at `data_poll_interval`.
+- `Manual` does not connect a live listener; call `refresh_from_data()` when the UI should update.
 
 ## Quick Start
 
@@ -37,4 +47,4 @@ Use the `Show all...` entries in the data property, control property, and contro
 4. Use `UI -> Data` for plain nodes that do not emit `property_changed`.
 5. Use `Data -> UI` or `Two Way` for nodes that extend `BindableModel` or otherwise emit `property_changed(property, value)`.
 
-See `res://addons/data_binding/samples/data_binding_sample.tscn` for a small scene containing both observable data bindings and one-way UI-to-data bindings.
+See `res://addons/data_binding/samples/data_binding_sample.tscn` for a small scene containing observable bindings, one-way UI-to-data bindings for signal-free plain data, and a custom data-signal binding.

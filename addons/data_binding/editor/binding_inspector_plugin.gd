@@ -5,6 +5,12 @@ extends EditorInspectorPlugin
 const BindingPropertyPicker := preload("res://addons/data_binding/editor/binding_property_picker.gd")
 const BindingSignalPicker := preload("res://addons/data_binding/editor/binding_signal_picker.gd")
 
+const MODE_DATA_TO_UI := 0
+const MODE_UI_TO_DATA := 1
+const MODE_TWO_WAY := 2
+const DATA_CHANGED_SIGNAL_MODE_MASK := (1 << MODE_DATA_TO_UI) | (1 << MODE_TWO_WAY)
+const CONTROL_CHANGED_SIGNAL_MODE_MASK := (1 << MODE_UI_TO_DATA) | (1 << MODE_TWO_WAY)
+
 var _editor_plugin: EditorPlugin
 
 
@@ -28,6 +34,10 @@ func _parse_property(
 ) -> bool:
 	if object is PropertyBinding and name == "data_property":
 		add_property_editor(name, _make_property_picker(object, name, "data_node", "data_node"))
+		return true
+
+	if object is PropertyBinding and name == "data_changed_signal":
+		add_property_editor(name, _make_data_signal_picker(object))
 		return true
 
 	if object is PropertyBinding and name == "control_property":
@@ -163,5 +173,43 @@ func _make_property_picker(
 
 func _make_signal_picker(binding: PropertyBinding) -> EditorProperty:
 	var picker := BindingSignalPicker.new()
-	picker.setup(binding)
+	picker.setup(
+		binding,
+		&"control_changed_signal",
+		&"control_node",
+		"control_node",
+		&"control_property",
+		"control_property",
+		true,
+		false,
+		&"show_all_control_signals",
+		&"",
+		"Show all control signals",
+		"Show configured control signals only",
+		"No configured signals",
+		"No reflected signals",
+		CONTROL_CHANGED_SIGNAL_MODE_MASK
+	)
+	return picker
+
+
+func _make_data_signal_picker(binding: PropertyBinding) -> EditorProperty:
+	var picker := BindingSignalPicker.new()
+	picker.setup(
+		binding,
+		&"data_changed_signal",
+		&"data_node",
+		"data_node",
+		&"",
+		"",
+		false,
+		true,
+		&"show_all_data_signals",
+		&"property_changed",
+		"Show all data signals",
+		"Show class data signals only",
+		"No class data signals",
+		"No reflected data signals",
+		DATA_CHANGED_SIGNAL_MODE_MASK
+	)
 	return picker

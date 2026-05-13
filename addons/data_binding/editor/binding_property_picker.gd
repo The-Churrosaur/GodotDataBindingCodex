@@ -175,7 +175,7 @@ func _get_show_all_label(target: Object, is_showing_all: bool) -> String:
 		option_type = "control properties"
 
 	if is_showing_all:
-		return "Show recommended %s only" % option_type
+		return "Show configured %s only" % option_type
 	return "Show all %s" % option_type
 
 

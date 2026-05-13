@@ -18,17 +18,27 @@ enum InitialSync {
 	UI_TO_DATA,
 }
 
+enum DataUpdateSource {
+	SIGNAL_ONLY,
+	POLLING,
+	MANUAL,
+}
+
 const DATA_CHANGED_SIGNAL := &"property_changed"
 
 ## Enables this binding at runtime.
 @export var enabled := true
 ## Controls which direction values flow between the data node and control node.
-@export_enum("Data → UI", "UI → Data", "Two Way", "Initial Sync Only") var mode: int = BindingMode.DATA_TO_UI
+@export_enum("Data -> UI", "UI -> Data", "Two Way", "Initial Sync Only") var mode: int = BindingMode.DATA_TO_UI:
+	set(value):
+		if mode == value:
+			return
+		mode = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
 ## Optional initial value sync performed after runtime connections are made.
-@export_enum("None", "Data → UI", "UI → Data") var initial_sync: int = InitialSync.DATA_TO_UI
+@export_enum("None", "Data -> UI", "UI -> Data") var initial_sync: int = InitialSync.DATA_TO_UI
 
-
-#@export_group("Data") # data spacer
 
 ## Node containing the data property.
 @export var data_node: Node:
@@ -38,17 +48,6 @@ const DATA_CHANGED_SIGNAL := &"property_changed"
 		data_node = value
 		if Engine.is_editor_hint():
 			notify_property_list_changed()
-## Reflected property name on data_node.
-@export var data_property: StringName = &"":
-	set(value):
-		if data_property == value:
-			return
-		data_property = value
-		if Engine.is_editor_hint():
-			notify_property_list_changed()
-
-#@export_group("Control") # control spacer
-
 ## Control node containing the UI property.
 @export var control_node: Control:
 	set(value):
@@ -57,23 +56,21 @@ const DATA_CHANGED_SIGNAL := &"property_changed"
 		control_node = value
 		if Engine.is_editor_hint():
 			notify_property_list_changed()
+
+## Reflected property name on data_node.
+@export var data_property: StringName = &"":
+	set(value):
+		if data_property == value:
+			return
+		data_property = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
 ## Reflected property name on control_node.
 @export var control_property: StringName = &"":
 	set(value):
 		if control_property == value:
 			return
 		control_property = value
-		if Engine.is_editor_hint():
-			notify_property_list_changed()
-
-#@export_group("Control Signals")
-
-## Manual signal override for custom controls. Empty uses the configured default signal.
-@export var control_changed_signal: StringName = &"":
-	set(value):
-		if control_changed_signal == value:
-			return
-		control_changed_signal = value
 		if Engine.is_editor_hint():
 			notify_property_list_changed()
 ## Optional converter that maps between data and control value representations.
@@ -85,6 +82,36 @@ const DATA_CHANGED_SIGNAL := &"property_changed"
 		if Engine.is_editor_hint():
 			notify_property_list_changed()
 
+## Chooses how live data-to-UI updates are detected after initial sync.
+@export_enum("Signal Only", "Polling", "Manual") var data_update_source: int = DataUpdateSource.SIGNAL_ONLY:
+	set(value):
+		if data_update_source == value:
+			return
+		data_update_source = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+## Signal on data_node that triggers refresh_from_data().
+## Signal arguments are ignored; the binding reads data_property when the signal fires.
+@export var data_changed_signal: StringName = DATA_CHANGED_SIGNAL:
+	set(value):
+		if data_changed_signal == value:
+			return
+		data_changed_signal = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+## Interval, in seconds, for polling data properties when polling is active.
+@export_range(0.05, 5.0, 0.05, "suffix:s") var data_poll_interval := 0.25:
+	set(value):
+		data_poll_interval = maxf(value, 0.05)
+## Manual signal override for custom controls. Empty uses the configured default signal.
+@export var control_changed_signal: StringName = &"":
+	set(value):
+		if control_changed_signal == value:
+			return
+		control_changed_signal = value
+		if Engine.is_editor_hint():
+			notify_property_list_changed()
+
 @export_group("Runtime Binding")
 ## Rebuilds this binding automatically from _ready() during runtime.
 @export var rebind_on_ready := false
@@ -93,6 +120,8 @@ const DATA_CHANGED_SIGNAL := &"property_changed"
 
 ## Editor-only picker state for showing fallback data properties.
 var show_all_data_properties := false
+## Editor-only picker state for showing inherited/reflected data signals.
+var show_all_data_signals := false
 ## Editor-only picker state for showing fallback control properties.
 var show_all_control_properties := false
 ## Editor-only picker state for showing reflected control signals.
@@ -100,26 +129,53 @@ var show_all_control_signals := false
 
 var _updating := false
 var _connected_data_node: Node
+var _connected_data_signal := &""
 var _connected_control_node: Control
 var _connected_control_signal := &""
 var _connected_control_callable: Callable
 var _connected_data_callable: Callable
+var _is_polling_data := false
+var _poll_elapsed := 0.0
+var _last_polled_value: Variant
 
 
 func _init() -> void:
-	_connected_data_callable = Callable(self, "_on_data_property_changed")
+	_connected_data_callable = Callable(self, "_on_data_changed")
 
 
 func _ready() -> void:
 	if Engine.is_editor_hint():
+		set_process(false)
 		return
 
 	if rebind_on_ready:
 		rebuild()
 
 
+func _process(delta: float) -> void:
+	if Engine.is_editor_hint() or not _is_polling_data:
+		return
+
+	_poll_elapsed += delta
+	if _poll_elapsed < data_poll_interval:
+		return
+
+	_poll_elapsed = 0.0
+	_poll_data_property()
+
+
 func _exit_tree() -> void:
 	disconnect_binding()
+
+
+func _validate_property(property: Dictionary) -> void:
+	var property_name := StringName(property.get("name", ""))
+	if property_name == &"data_update_source" and not _uses_live_data_to_ui_updates():
+		property["usage"] = int(property.get("usage", PROPERTY_USAGE_DEFAULT)) | PROPERTY_USAGE_READ_ONLY
+	if property_name == &"data_poll_interval" and not _uses_data_poll_interval():
+		property["usage"] = PROPERTY_USAGE_NO_EDITOR
+	if property_name == &"data_changed_signal" and (not _uses_live_data_to_ui_updates() or data_update_source != DataUpdateSource.SIGNAL_ONLY):
+		property["usage"] = PROPERTY_USAGE_NO_EDITOR
 
 
 ## Disconnects existing listeners, validates settings, reconnects listeners, and applies initial sync.
@@ -140,8 +196,10 @@ func rebuild() -> void:
 	if issues.size() > 0:
 		return
 
-	if _uses_data_to_ui() and mode != BindingMode.INITIAL_SYNC_ONLY:
+	if _should_connect_data_changed_signal():
 		_connect_data_changed_signal()
+	elif _should_poll_data():
+		_start_data_polling()
 
 	if _uses_ui_to_data():
 		_connect_control_changed_signal()
@@ -154,20 +212,28 @@ func rebuild() -> void:
 			if _can_read_control() and _can_write_data():
 				commit_to_data()
 
+	if _is_polling_data:
+		_reset_data_poll_snapshot()
+
 
 ## Disconnects signal listeners created by rebuild().
 func disconnect_binding() -> void:
-	if _connected_data_node != null and _connected_data_node.is_connected(DATA_CHANGED_SIGNAL, _connected_data_callable):
-		_connected_data_node.disconnect(DATA_CHANGED_SIGNAL, _connected_data_callable)
+	_stop_data_polling()
+
+	if _connected_data_node != null and _connected_data_signal != &"" and not _connected_data_callable.is_null():
+		if _connected_data_node.is_connected(_connected_data_signal, _connected_data_callable):
+			_connected_data_node.disconnect(_connected_data_signal, _connected_data_callable)
 
 	if _connected_control_node != null and _connected_control_signal != &"" and not _connected_control_callable.is_null():
 		if _connected_control_node.is_connected(_connected_control_signal, _connected_control_callable):
 			_connected_control_node.disconnect(_connected_control_signal, _connected_control_callable)
 
 	_connected_data_node = null
+	_connected_data_signal = &""
 	_connected_control_node = null
 	_connected_control_signal = &""
 	_connected_control_callable = Callable()
+	_connected_data_callable = Callable(self, "_on_data_changed")
 
 
 ## Pulls the current data value, converts it, and writes it to the control property.
@@ -225,9 +291,11 @@ func validate() -> PackedStringArray:
 			control_property,
 		])
 
-	if _uses_data_to_ui() and mode != BindingMode.INITIAL_SYNC_ONLY:
-		if data_node != null and not data_node.has_signal(DATA_CHANGED_SIGNAL):
-			issues.append("Data -> UI updates require the data node to emit property_changed(property, value).")
+	if _uses_live_data_to_ui_updates():
+		if data_update_source == DataUpdateSource.SIGNAL_ONLY:
+			var signal_issue := _data_changed_signal_validation_issue()
+			if signal_issue != "":
+				issues.append(signal_issue)
 
 	if _uses_ui_to_data():
 		if converter != null and not converter.can_convert_back():
@@ -244,11 +312,21 @@ func validate() -> PackedStringArray:
 
 
 func _connect_data_changed_signal() -> void:
-	if data_node == null or not data_node.has_signal(DATA_CHANGED_SIGNAL):
+	var signal_name := _get_data_changed_signal()
+	if data_node == null or signal_name == &"" or not data_node.has_signal(signal_name):
 		return
-	if not data_node.is_connected(DATA_CHANGED_SIGNAL, _connected_data_callable):
-		data_node.connect(DATA_CHANGED_SIGNAL, _connected_data_callable)
+
+	var callback := Callable(self, "_on_data_changed")
+	var argument_count := ControlBindingAdaptersScript.get_signal_argument_count(data_node, signal_name)
+	if argument_count > 0:
+		callback = callback.unbind(argument_count)
+
+	if not data_node.is_connected(signal_name, callback):
+		data_node.connect(signal_name, callback)
+
 	_connected_data_node = data_node
+	_connected_data_signal = signal_name
+	_connected_data_callable = callback
 
 
 func _connect_control_changed_signal() -> void:
@@ -264,31 +342,50 @@ func _connect_control_changed_signal() -> void:
 	if not control_node.is_connected(signal_name, callback):
 		control_node.connect(signal_name, callback)
 
-	_connected_control_node = control_node
-	_connected_control_signal = signal_name
-	_connected_control_callable = callback
+		_connected_control_node = control_node
+		_connected_control_signal = signal_name
+		_connected_control_callable = callback
 
 
-func _on_data_property_changed(changed_property, value: Variant = null) -> void:
-	if _updating:
-		return
-	if StringName(changed_property) != data_property:
+func _start_data_polling() -> void:
+	if data_node == null or data_property == &"":
 		return
 
-	if value == null:
-		refresh_from_data()
+	_is_polling_data = true
+	_poll_elapsed = 0.0
+	_reset_data_poll_snapshot()
+	set_process(true)
+
+
+func _stop_data_polling() -> void:
+	_is_polling_data = false
+	_poll_elapsed = 0.0
+	_last_polled_value = null
+	set_process(false)
+
+
+func _poll_data_property() -> void:
+	if _updating or not _can_read_data():
 		return
 
-	if not _can_write_control():
+	var current_value := data_node.get(data_property)
+	if _values_equal(current_value, _last_polled_value):
 		return
 
-	var target_value := _convert_to_target(value)
-	if _values_equal(control_node.get(control_property), target_value):
+	_last_polled_value = _snapshot_value(current_value)
+	refresh_from_data()
+
+
+func _reset_data_poll_snapshot() -> void:
+	if not _can_read_data():
+		_last_polled_value = null
 		return
 
-	_updating = true
-	control_node.set(control_property, target_value)
-	_updating = false
+	_last_polled_value = _snapshot_value(data_node.get(data_property))
+
+
+func _on_data_changed() -> void:
+	refresh_from_data()
 
 
 func _on_control_changed() -> void:
@@ -303,8 +400,59 @@ func _get_control_changed_signal() -> StringName:
 	)
 
 
+func _get_data_changed_signal() -> StringName:
+	return data_changed_signal
+
+
+func _data_changed_signal_validation_issue() -> String:
+	if data_node == null:
+		return ""
+
+	var signal_name := _get_data_changed_signal()
+	if signal_name == &"":
+		return "No valid data changed signal selected."
+	if not data_node.has_signal(signal_name):
+		return "No valid data changed signal selected. Data signal '%s' was not found on %s." % [
+			signal_name,
+			data_node.name,
+		]
+
+	return ""
+
+
+func _should_connect_data_changed_signal() -> bool:
+	if not _uses_live_data_to_ui_updates():
+		return false
+
+	match data_update_source:
+		DataUpdateSource.SIGNAL_ONLY:
+			var signal_name := _get_data_changed_signal()
+			return data_node != null and signal_name != &"" and data_node.has_signal(signal_name)
+		_:
+			return false
+
+
+func _should_poll_data() -> bool:
+	if not _uses_live_data_to_ui_updates():
+		return false
+
+	match data_update_source:
+		DataUpdateSource.POLLING:
+			return true
+		_:
+			return false
+
+
+func _uses_data_poll_interval() -> bool:
+	return _uses_live_data_to_ui_updates() and data_update_source == DataUpdateSource.POLLING
+
+
 func _uses_data_to_ui() -> bool:
 	return mode == BindingMode.DATA_TO_UI or mode == BindingMode.TWO_WAY or mode == BindingMode.INITIAL_SYNC_ONLY
+
+
+func _uses_live_data_to_ui_updates() -> bool:
+	return _uses_data_to_ui() and mode != BindingMode.INITIAL_SYNC_ONLY
 
 
 func _uses_ui_to_data() -> bool:
@@ -401,3 +549,15 @@ func _convert_to_source(value: Variant) -> Variant:
 
 func _values_equal(left: Variant, right: Variant) -> bool:
 	return left == right
+
+
+func _snapshot_value(value: Variant) -> Variant:
+	match typeof(value):
+		TYPE_ARRAY:
+			var array_value: Array = value
+			return array_value.duplicate(true)
+		TYPE_DICTIONARY:
+			var dictionary_value: Dictionary = value
+			return dictionary_value.duplicate(true)
+		_:
+			return value
