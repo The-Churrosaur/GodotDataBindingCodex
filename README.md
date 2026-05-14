@@ -12,15 +12,13 @@ The addon provides node-based bindings, curated control property and signal pick
 
 ## Runtime Pieces
 
-- `BindableModel` is an optional base class for data nodes that can notify bindings when a property changes.
 - `PropertyBinding` is a node that connects one data property to one control property.
 - `BindingHost` is a grouping node that can rebuild, disconnect, and validate child bindings.
 - `BindingConverter` is a reusable `Resource` for translating values between data and UI representations.
-- `NumericScaleConverter` maps numeric ranges, such as `0.0..1.0` in data to `0..100` in a slider.
 
 ## Editor Property Lists
 
-Data node property pickers reflect editor-visible properties directly from the assigned data node.
+Data node property pickers reflect editor-visible `Export` tagged properties directly from the assigned data node.
 
 Control node property pickers are intentionally curated so common controls do not expose every inherited `Control` property. Edit `res://addons/data_binding/config/control_bindings.json` to add or remove bindable properties for exact built-in control types.
 
@@ -35,7 +33,7 @@ Use the `Show all...` entries in the data property, data signal, control propert
 ## Binding Modes
 
 - `Data -> UI` listens for data changes and writes to the control.
-- `UI -> Data` listens only to the control change signal and writes to the data node. The data node does not need to implement `property_changed`.
+- `UI -> Data` listens only to the control change signal and writes to the data node.
 - `Two Way` connects both sides and uses a reentrancy guard to avoid echo loops.
 - `Initial Sync Only` performs the configured initial sync without listening for later changes.
 
@@ -44,16 +42,17 @@ Use the `Show all...` entries in the data property, data signal, control propert
 `PropertyBinding.data_update_source` controls how live data-to-UI updates are detected:
 
 - `Signal Only` requires the data node to expose the selected `data_changed_signal`. This is the default.
-- `Polling` always checks the reflected data property at `data_poll_interval`.
+- `Polling` always checks the reflected data property at `data_poll_interval`. Use sparingly - incurs a performance cost.
 - `Manual` does not connect a live listener; call `refresh_from_data()` when the UI should update.
 
 ## Quick Start
 
 1. Add a `BindingHost` near the UI controls it owns.
-2. Add `PropertyBinding` children under the host.
+2. Add `PropertyBinding` children under the host or press `BindingHost`'s `Add PropertyBinding Child` button in the inspector.
 3. Assign `data_node`, `data_property`, `control_node`, and `control_property`.
-4. Use `UI -> Data` for plain nodes that do not emit `property_changed`.
-5. Use `Data -> UI` or `Two Way` for nodes that extend `BindableModel` or otherwise emit `property_changed(property, value)`.
+4. Assign an appropriate (Binding) `Mode`.
+5. Assign `data_update_source`, `data_changed_signal`, and `control_changed_signal` as necessary according to your `Mode`.
+
 
 See `res://addons/data_binding/samples/data_binding_sample.tscn` for a small scene containing observable bindings, one-way UI-to-data bindings for signal-free plain data, and a custom data-signal binding.
 
