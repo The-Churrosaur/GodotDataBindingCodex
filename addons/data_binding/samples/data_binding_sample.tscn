@@ -82,7 +82,7 @@ anchor_bottom = 0.9
 
 [node name="NameLabel" type="Label" parent="Form" unique_id=159412368]
 layout_mode = 2
-text = "Player name"
+text = "Player name (exported data field)"
 
 [node name="NameEdit" type="LineEdit" parent="Form" unique_id=1293601381]
 layout_mode = 2
@@ -107,7 +107,7 @@ layout_mode = 2
 
 [node name="NicknameLabel" type="Label" parent="Form" unique_id=298841092]
 layout_mode = 2
-text = "Nickname written to a plain node"
+text = "Nickname written to a plain node (exported field)"
 
 [node name="NicknameEdit" type="LineEdit" parent="Form" unique_id=1307194245]
 layout_mode = 2

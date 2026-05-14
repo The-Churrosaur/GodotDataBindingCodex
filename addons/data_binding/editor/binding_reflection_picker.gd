@@ -20,21 +20,25 @@ static func get_bindable_properties(
 	var allowed_control_properties := PackedStringArray()
 	var allowed_control_property_order := {}
 	var limit_to_control_catalog := object is Control
-	var limit_to_script_data_properties := not limit_to_control_catalog and not include_inherited_data_properties
-	var script_property_names := {}
+	var limit_to_exported_data_properties := not limit_to_control_catalog and not include_inherited_data_properties
+	var exported_script_property_names := {}
 	if limit_to_control_catalog:
 		allowed_control_properties = ControlBindingCatalog.get_bindable_properties(object)
 		for index in range(allowed_control_properties.size()):
 			allowed_control_property_order[String(allowed_control_properties[index])] = index
 	else:
-		script_property_names = _get_script_property_names(object)
+		exported_script_property_names = _get_exported_script_property_names(object)
 
 	for property_info in object.get_property_list():
 		if not _is_bindable_property(property_info):
 			continue
 
 		var property_name := StringName(property_info.get("name", ""))
-		var is_script_variable := _is_script_variable(property_info) or script_property_names.has(String(property_name))
+		var is_known_script_property := _is_script_variable(property_info) or exported_script_property_names.has(String(property_name))
+		var is_exported_data_property := _is_exported_data_property(
+			property_info,
+			exported_script_property_names.has(String(property_name))
+		)
 		var is_cataloged_control_property := allowed_control_properties.has(String(property_name))
 		var is_fallback_property := false
 		if limit_to_control_catalog and not is_cataloged_control_property and not include_uncataloged_control_properties:
@@ -42,8 +46,8 @@ static func get_bindable_properties(
 		if limit_to_control_catalog:
 			is_fallback_property = not is_cataloged_control_property
 		else:
-			is_fallback_property = not is_script_variable
-			if limit_to_script_data_properties and is_fallback_property:
+			is_fallback_property = not is_exported_data_property
+			if limit_to_exported_data_properties and is_fallback_property:
 				continue
 
 		properties.append({
@@ -51,7 +55,7 @@ static func get_bindable_properties(
 			"label": _format_property_label(property_info),
 			"type": int(property_info.get("type", TYPE_NIL)),
 			"usage": int(property_info.get("usage", 0)),
-			"is_script_variable": is_script_variable,
+			"is_script_variable": is_known_script_property,
 			"is_cataloged": not limit_to_control_catalog or is_cataloged_control_property,
 			"is_fallback": is_fallback_property,
 			"catalog_order": allowed_control_property_order.get(String(property_name), -1),
@@ -84,7 +88,16 @@ static func _is_script_variable(property_info: Dictionary) -> bool:
 	return (usage & PROPERTY_USAGE_SCRIPT_VARIABLE) != 0
 
 
-static func _get_script_property_names(object: Object) -> Dictionary:
+static func _is_exported_data_property(property_info: Dictionary, is_known_exported_script_property: bool) -> bool:
+	var usage := int(property_info.get("usage", 0))
+	var has_storage_usage := (usage & PROPERTY_USAGE_STORAGE) != 0
+	if not has_storage_usage:
+		return false
+
+	return _is_script_variable(property_info) or is_known_exported_script_property
+
+
+static func _get_exported_script_property_names(object: Object) -> Dictionary:
 	var property_names := {}
 	var script := object.get_script()
 	if script == null or not script.has_method("get_script_property_list"):
@@ -96,6 +109,11 @@ static func _get_script_property_names(object: Object) -> Dictionary:
 
 	for property_info in script_properties:
 		if typeof(property_info) != TYPE_DICTIONARY:
+			continue
+
+		var usage := int(property_info.get("usage", 0))
+		var has_storage_usage := (usage & PROPERTY_USAGE_STORAGE) != 0
+		if not has_storage_usage:
 			continue
 
 		var property_name := String(property_info.get("name", ""))
