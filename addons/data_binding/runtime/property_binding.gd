@@ -4,6 +4,8 @@ class_name PropertyBinding
 
 ## Connects one data node property to one UI Control property.
 const ControlBindingAdaptersScript := preload("res://addons/data_binding/runtime/control_binding_adapters.gd")
+const BindingTypeCompatibilityScript := preload("res://addons/data_binding/runtime/binding_type_compatibility.gd")
+const BindingReflectionCoreScript := preload("res://addons/data_binding/runtime/binding_reflection_core.gd")
 
 enum BindingMode {
 	DATA_TO_UI,
@@ -279,10 +281,10 @@ func validate() -> PackedStringArray:
 	if control_property == &"":
 		issues.append("Control property is empty.")
 
-	if data_node != null and data_property != &"" and not _property_exists(data_node, data_property):
+	if data_node != null and data_property != &"" and not BindingReflectionCoreScript.has_property(data_node, data_property):
 		issues.append("Data property '%s' was not found on %s." % [data_property, data_node.name])
 
-	if control_node != null and control_property != &"" and not _property_exists(control_node, control_property):
+	if control_node != null and control_property != &"" and not BindingReflectionCoreScript.has_property(control_node, control_property):
 		issues.append("Control property '%s' was not found on %s." % [control_property, control_node.name])
 
 	if _can_read_data() and _can_read_control() and not _selected_property_types_are_compatible():
@@ -460,7 +462,7 @@ func _uses_ui_to_data() -> bool:
 
 
 func _can_read_data() -> bool:
-	return data_node != null and data_property != &"" and _property_exists(data_node, data_property)
+	return data_node != null and data_property != &"" and BindingReflectionCoreScript.has_property(data_node, data_property)
 
 
 func _can_write_data() -> bool:
@@ -468,71 +470,17 @@ func _can_write_data() -> bool:
 
 
 func _can_read_control() -> bool:
-	return control_node != null and control_property != &"" and _property_exists(control_node, control_property)
+	return control_node != null and control_property != &"" and BindingReflectionCoreScript.has_property(control_node, control_property)
 
 
 func _can_write_control() -> bool:
 	return _can_read_control()
 
 
-func _property_exists(object: Object, property_name: StringName) -> bool:
-	if object == null or property_name == &"":
-		return false
-
-	for property_info in object.get_property_list():
-		if StringName(property_info.get("name", "")) == property_name:
-			return true
-
-	return false
-
-
 func _selected_property_types_are_compatible() -> bool:
-	var data_type := _property_type(data_node, data_property)
-	var control_type := _property_type(control_node, control_property)
-
-	match mode:
-		BindingMode.DATA_TO_UI, BindingMode.INITIAL_SYNC_ONLY:
-			return _can_convert_types(data_type, control_type, false)
-		BindingMode.UI_TO_DATA:
-			return _can_convert_types(data_type, control_type, true)
-		BindingMode.TWO_WAY:
-			return _can_convert_types(data_type, control_type, false) and _can_convert_types(data_type, control_type, true)
-		_:
-			return _can_convert_types(data_type, control_type, false)
-
-
-func _property_type(object: Object, property_name: StringName) -> int:
-	if object == null or property_name == &"":
-		return TYPE_NIL
-
-	for property_info in object.get_property_list():
-		if StringName(property_info.get("name", "")) == property_name:
-			return int(property_info.get("type", TYPE_NIL))
-
-	return TYPE_NIL
-
-
-func _can_convert_types(data_type: int, control_type: int, reverse: bool) -> bool:
-	if converter != null:
-		if reverse:
-			return converter.can_convert_back_types(data_type, control_type)
-		return converter.can_convert_types(data_type, control_type)
-
-	if reverse:
-		return _types_are_assignable(control_type, data_type)
-	return _types_are_assignable(data_type, control_type)
-
-
-func _types_are_assignable(source_type: int, target_type: int) -> bool:
-	if source_type == TYPE_NIL or target_type == TYPE_NIL:
-		return true
-	if source_type == target_type:
-		return true
-	if source_type in [TYPE_INT, TYPE_FLOAT] and target_type in [TYPE_INT, TYPE_FLOAT]:
-		return true
-	if source_type in [TYPE_STRING, TYPE_STRING_NAME] and target_type in [TYPE_STRING, TYPE_STRING_NAME]:
-		return true
-	return false
+	var data_type := BindingReflectionCoreScript.get_property_type(data_node, data_property)
+	var control_type := BindingReflectionCoreScript.get_property_type(control_node, control_property)
+	return BindingTypeCompatibilityScript.are_types_compatible_for_mode(mode, data_type, control_type, converter)
 
 
 func _convert_to_target(value: Variant) -> Variant:

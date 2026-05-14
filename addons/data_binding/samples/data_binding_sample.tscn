@@ -29,7 +29,6 @@ data_node = NodePath("../../PlayerData")
 control_node = NodePath("../../Form/NameEdit")
 data_property = &"player_name"
 control_property = &"text"
-rebind_on_ready = true
 
 [node name="HealthToSlider" type="Node" parent="Bindings" unique_id=101542114 node_paths=PackedStringArray("data_node", "control_node")]
 script = ExtResource("2_binding")
@@ -38,7 +37,6 @@ data_node = NodePath("../../PlayerData")
 control_node = NodePath("../../Form/HealthSlider")
 data_property = &"health"
 control_property = &"value"
-rebind_on_ready = true
 
 [node name="InvincibleToCheck" type="Node" parent="Bindings" unique_id=2144071011 node_paths=PackedStringArray("data_node", "control_node")]
 script = ExtResource("2_binding")
@@ -47,7 +45,6 @@ data_node = NodePath("../../PlayerData")
 control_node = NodePath("../../Form/InvincibleCheck")
 data_property = &"invincible"
 control_property = &"button_pressed"
-rebind_on_ready = true
 
 [node name="TitleCustomSignalToLabel" type="Node" parent="Bindings" unique_id=1769241700 node_paths=PackedStringArray("data_node", "control_node")]
 script = ExtResource("2_binding")
@@ -56,16 +53,15 @@ control_node = NodePath("../../Form/TitleSignalValue")
 data_property = &"title"
 control_property = &"text"
 data_changed_signal = &"title_changed"
-rebind_on_ready = true
 
 [node name="NicknameUiToPlainData" type="Node" parent="Bindings" unique_id=94847093 node_paths=PackedStringArray("data_node", "control_node")]
 script = ExtResource("2_binding")
 mode = 1
+initial_sync = 0
 data_node = NodePath("../../PlainSettings")
 control_node = NodePath("../../Form/NicknameEdit")
 data_property = &"nickname"
 control_property = &"text"
-rebind_on_ready = true
 
 [node name="MetricsUiToPlainData" type="Node" parent="Bindings" unique_id=1465615574 node_paths=PackedStringArray("data_node", "control_node")]
 script = ExtResource("2_binding")
@@ -75,7 +71,6 @@ data_node = NodePath("../../PlainSettings")
 control_node = NodePath("../../Form/MetricsCheck")
 data_property = &"send_metrics"
 control_property = &"button_pressed"
-rebind_on_ready = true
 
 [node name="Form" type="VBoxContainer" parent="." unique_id=866856334]
 layout_mode = 1

@@ -1,9 +1,4 @@
 {
-	"CanvasItem": {
-		"visible": {},
-		"modulate": {},
-		"self_modulate": {}
-	},
 	"Control": {
 		"tooltip_text": {},
 		"mouse_filter": {},
@@ -42,14 +37,6 @@
 		"placeholder_text": {},
 		"editable": {}
 	},
-	"BaseButton": {
-		"button_pressed": {
-			"signals": [
-				"toggled"
-			]
-		},
-		"disabled": {}
-	},
 	"Button": {
 		"button_pressed": {
 			"signals": [
@@ -75,12 +62,6 @@
 		},
 		"text": {}
 	},
-	"Range": {
-		"value": {},
-		"min_value": {},
-		"max_value": {},
-		"step": {}
-	},
 	"ProgressBar": {
 		"value": {},
 		"min_value": {},
@@ -97,16 +78,6 @@
 		"max_value": {},
 		"step": {},
 		"editable": {}
-	},
-	"Slider": {
-		"value": {
-			"signals": [
-				"value_changed"
-			]
-		},
-		"min_value": {},
-		"max_value": {},
-		"step": {}
 	},
 	"HSlider": {
 		"value": {
@@ -127,13 +98,6 @@
 		"min_value": {},
 		"max_value": {},
 		"step": {}
-	},
-	"ScrollBar": {
-		"value": {
-			"signals": [
-				"value_changed"
-			]
-		}
 	},
 	"HScrollBar": {
 		"value": {
@@ -181,5 +145,43 @@
 	},
 	"Container": {
 		"visible": {}
+	},
+	"_templates": {
+		"CanvasItem": {
+			"visible": {},
+			"modulate": {},
+			"self_modulate": {}
+		},
+		"BaseButton": {
+			"button_pressed": {
+				"signals": [
+					"toggled"
+				]
+			},
+			"disabled": {}
+		},
+		"Range": {
+			"value": {},
+			"min_value": {},
+			"max_value": {},
+			"step": {}
+		},
+		"Slider": {
+			"value": {
+				"signals": [
+					"value_changed"
+				]
+			},
+			"min_value": {},
+			"max_value": {},
+			"step": {}
+		},
+		"ScrollBar": {
+			"value": {
+				"signals": [
+					"value_changed"
+				]
+			}
+		}
 	}
 }

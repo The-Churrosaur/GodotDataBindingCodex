@@ -2,12 +2,8 @@
 extends EditorProperty
 
 ## Custom inspector picker for PropertyBinding data_property and control_property fields.
-const PropertyReflection := preload("res://addons/data_binding/editor/property_reflection.gd")
-
-const MODE_DATA_TO_UI := 0
-const MODE_UI_TO_DATA := 1
-const MODE_TWO_WAY := 2
-const MODE_INITIAL_SYNC_ONLY := 3
+const BindingReflectionPicker := preload("res://addons/data_binding/editor/binding_reflection_picker.gd")
+const BindingTypeCompatibility := preload("res://addons/data_binding/runtime/binding_type_compatibility.gd")
 const META_KIND_COMMAND := "command"
 const COMMAND_SET_SHOW_ALL := "set_show_all"
 
@@ -53,7 +49,7 @@ func _rebuild_options() -> void:
 		_add_disabled_item("Assign %s first" % _target_label)
 		return
 
-	var options := PropertyReflection.get_bindable_properties(
+	var options := BindingReflectionPicker.get_bindable_properties(
 		target,
 		_should_include_fallback_control_properties(target),
 		_should_include_fallback_data_properties(target)
@@ -203,43 +199,11 @@ func _is_compatible_control_property_option(option: Dictionary) -> bool:
 	if data_node == null or data_property == &"":
 		return true
 
-	var data_type := PropertyReflection.get_property_type(data_node, data_property)
+	var data_type := BindingReflectionPicker.get_property_type(data_node, data_property)
 	var control_type := int(option.get("type", TYPE_NIL))
 	var converter := _binding.get("converter") as BindingConverter
 	var mode := int(_binding.get("mode"))
-
-	match mode:
-		MODE_DATA_TO_UI, MODE_INITIAL_SYNC_ONLY:
-			return _can_convert_types(data_type, control_type, converter, false)
-		MODE_UI_TO_DATA:
-			return _can_convert_types(data_type, control_type, converter, true)
-		MODE_TWO_WAY:
-			return _can_convert_types(data_type, control_type, converter, false) and _can_convert_types(data_type, control_type, converter, true)
-		_:
-			return _can_convert_types(data_type, control_type, converter, false)
-
-
-func _can_convert_types(data_type: int, control_type: int, converter: BindingConverter, reverse: bool) -> bool:
-	if converter != null:
-		if reverse:
-			return converter.can_convert_back_types(data_type, control_type)
-		return converter.can_convert_types(data_type, control_type)
-
-	if reverse:
-		return _types_are_assignable(control_type, data_type)
-	return _types_are_assignable(data_type, control_type)
-
-
-func _types_are_assignable(source_type: int, target_type: int) -> bool:
-	if source_type == TYPE_NIL or target_type == TYPE_NIL:
-		return true
-	if source_type == target_type:
-		return true
-	if source_type in [TYPE_INT, TYPE_FLOAT] and target_type in [TYPE_INT, TYPE_FLOAT]:
-		return true
-	if source_type in [TYPE_STRING, TYPE_STRING_NAME] and target_type in [TYPE_STRING, TYPE_STRING_NAME]:
-		return true
-	return false
+	return BindingTypeCompatibility.are_types_compatible_for_mode(mode, data_type, control_type, converter)
 
 
 func _add_disabled_item(text: String) -> void:

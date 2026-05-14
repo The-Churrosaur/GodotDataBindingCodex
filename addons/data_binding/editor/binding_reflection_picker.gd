@@ -1,8 +1,9 @@
 @tool
 extends RefCounted
 
-## Reflection helpers for building editor property picker options.
+## Editor picker reflection and filtering helpers for binding property dropdowns.
 const ControlBindingCatalog := preload("res://addons/data_binding/runtime/control_binding_catalog.gd")
+const BindingReflectionCore := preload("res://addons/data_binding/runtime/binding_reflection_core.gd")
 const PROPERTY_USAGE_BINDABLE := PROPERTY_USAGE_EDITOR
 
 
@@ -62,14 +63,7 @@ static func get_bindable_properties(
 
 ## Returns the Variant.Type for a reflected property, or TYPE_NIL when unknown.
 static func get_property_type(object: Object, property_name: StringName) -> int:
-	if object == null or property_name == &"":
-		return TYPE_NIL
-
-	for property_info in object.get_property_list():
-		if StringName(property_info.get("name", "")) == property_name:
-			return int(property_info.get("type", TYPE_NIL))
-
-	return TYPE_NIL
+	return BindingReflectionCore.get_property_type(object, property_name)
 
 
 static func _is_bindable_property(property_info: Dictionary) -> bool:

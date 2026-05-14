@@ -2,6 +2,8 @@
 extends Resource
 class_name BindingConverter
 
+const BindingTypeCompatibility := preload("res://addons/data_binding/runtime/binding_type_compatibility.gd")
+
 ## Whether this converter can transform target/control values back into source/data values.
 @export var reversible := true
 
@@ -23,21 +25,9 @@ func can_convert_back() -> bool:
 
 ## Returns true when this converter can map source_type into target_type.
 func can_convert_types(source_type: int, target_type: int) -> bool:
-	return _types_are_assignable(source_type, target_type)
+	return BindingTypeCompatibility.types_are_assignable(source_type, target_type)
 
 
 ## Returns true when this converter can map target_type back into source_type.
 func can_convert_back_types(source_type: int, target_type: int) -> bool:
-	return reversible and _types_are_assignable(target_type, source_type)
-
-
-func _types_are_assignable(source_type: int, target_type: int) -> bool:
-	if source_type == TYPE_NIL or target_type == TYPE_NIL:
-		return true
-	if source_type == target_type:
-		return true
-	if source_type in [TYPE_INT, TYPE_FLOAT] and target_type in [TYPE_INT, TYPE_FLOAT]:
-		return true
-	if source_type in [TYPE_STRING, TYPE_STRING_NAME] and target_type in [TYPE_STRING, TYPE_STRING_NAME]:
-		return true
-	return false
+	return reversible and BindingTypeCompatibility.types_are_assignable(target_type, source_type)
